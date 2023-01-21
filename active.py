@@ -24,6 +24,8 @@ class SSM:
         kernel under consideration
     sample_size:int
         sample_size used. default is 59
+    warm_start: int:
+        Initial number of iteration(s) needed before prototype stability is reached
     early_stopping:int
         specifies the stopping criteria when support vector stability is reached.
 
@@ -40,7 +42,15 @@ class SSM:
         self.early_stopping = early_stopping
         self.warm_start = warm_start
 
-        
+        # try:
+        #     if not isinstance(self.labels, np.ndarray):
+        #         self.labels = np.array(self.labels)
+        # except KeyError:
+        #     raise 'wrong type'
+        #
+        # if not isinstance(self.dataset, np.ndarray):
+        #     self.dataset = np.array(self.dataset)
+
         if not isinstance(task, str):
             raise TypeError('learning task must be a str specified as "binary" or "multiclass" ')
 

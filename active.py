@@ -28,28 +28,23 @@ class SSM:
         Initial number of iteration(s) needed before prototype stability is reached
     early_stopping:int
         specifies the stopping criteria when support vector stability is reached.
+    top_n: bool:
+        True for the closest and False amongst top p%
 
 
     """
 
     def __init__(self, dataset, labels, task, kernel,
-                 sample_size=59, warm_start=4, early_stopping=2):
+                 sample_size=59, warm_start=4, early_stopping=2, top_n=True):
         self.dataset = dataset
         self.labels = labels
         self.kernel = kernel
         self.task = task
         self.sample_size = sample_size
         self.early_stopping = early_stopping
+        self.top_n = top_n
         self.warm_start = warm_start
-
-        # try:
-        #     if not isinstance(self.labels, np.ndarray):
-        #         self.labels = np.array(self.labels)
-        # except KeyError:
-        #     raise 'wrong type'
-        #
-        # if not isinstance(self.dataset, np.ndarray):
-        #     self.dataset = np.array(self.dataset)
+        self.top_closest = 5
 
         if not isinstance(task, str):
             raise TypeError('learning task must be a str specified as "binary" or "multiclass" ')
@@ -112,11 +107,9 @@ class SSM:
 
     def select_minimum_instance_binary(self, x):
         if self.task == 'binary':
-            distance_space = self.selection_metric(x)
-            minimum_distance_index = np.argmin(
-                np.absolute(distance_space)
-            )
-            return minimum_distance_index
+            distance_space = np.absolute(self.selection_metric(x))
+            return np.argmin(distance_space) if self.top_n else \
+                np.random.choice(distance_space.argsort()[:self.top_closest])
         return None
 
     def select_minimum_instance(self, x):
@@ -125,8 +118,10 @@ class SSM:
             max_relative_distance = [
                 np.max(distance) for distance in relative_distance_space
             ]
-            minimum_relative_distance_index = np.argmin(max_relative_distance)
-            return minimum_relative_distance_index
+            return np.argmin(max_relative_distance) if self.top_n else \
+                np.random.choice(
+                    np.array(max_relative_distance).argsort()[:self.top_closest]
+                )
         return None
 
     def get_active_instance_index(self, x):

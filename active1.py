@@ -33,10 +33,13 @@ class SSM:
         batch_size used by the supervised  active learning metric
     close_to_boundary: bool:
         True for border learning and False otherwise.
+    top_n: bool:
+        True for the closest and False amongst top p%
 
     """
+
     def __init__(self, dataset, labels, sample_size, warm_start,
-                 early_stopping, max_epochs, ord, batch_size=10,
+                 early_stopping, max_epochs, ord, batch_size=10, top_n=True,
                  close_to_boundary=True):
         self.dataset = dataset
         self.labels = labels
@@ -45,7 +48,9 @@ class SSM:
         self.warm_start = warm_start
         self.ord = ord
         self.close_to_boundary = close_to_boundary
+        self.top_n = top_n
         self.max_epochs = max_epochs
+        self.top_p = 5
         self.batch_size = batch_size
 
     @staticmethod
@@ -106,14 +111,21 @@ class SSM:
         return relative_distance, learned_components
 
     def get_active_instance_index(self):
-
         relative_distance_space = self.supervised_metric()[0]
         min_relative_distance = [
             torch.min(distance) for distance in relative_distance_space
         ]
         if self.close_to_boundary:
-            return torch.Tensor(min_relative_distance).argmax()
-        return torch.Tensor(min_relative_distance).argmin()
+            return self.get_top_p_close(min_relative_distance)
+        return self.get_top_p(min_relative_distance)
+
+    def get_top_p_close(self, x):
+        return torch.Tensor(x).argmax() if self.top_n else \
+            torch.tensor(x[torch.randperm(len(x))[:self.top_p]]).argmax()
+
+    def get_top_p(self, x):
+        return torch.Tensor(x).argmin() if self.top_n else \
+            torch.tensor(x[torch.randperm(len(x))[:self.top_p]]).argmin()
 
     def compute_learned_components_stability(self, learned_components_list):
 

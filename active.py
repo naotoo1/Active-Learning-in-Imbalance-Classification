@@ -45,6 +45,7 @@ class SSM:
         self.top_n = top_n
         self.warm_start = warm_start
         self.top_closest = 5
+        self.rand_indices = []
 
         if not isinstance(task, str):
             raise TypeError('learning task must be a str specified as "binary" or "multiclass" ')
@@ -69,41 +70,29 @@ class SSM:
         random_indices = random.sample(sequence, self.sample_size)
         random_instances = self.dataset[random_indices]
         labels_rand_instances = self.labels[random_indices]
-        return random_instances, labels_rand_instances
+        return random_instances, labels_rand_instances, random_indices
 
     def get_ssm(self):
-        smm = svm.SVC(
-            kernel=self.kernel,
-            probability=False
-        )
-        return smm.fit(
-            self.select_random_elements()[0],
-            self.select_random_elements()[1]
-        )
+        rand_ins, rand_ins_label, random_indices = self.select_random_elements()
+        self.rand_indices.append(random_indices)
+        smm = svm.SVC(kernel=self.kernel, probability=False)
+        smm.fit(rand_ins, rand_ins_label)
 
-    def supervised_metric_svm_linear(self):
+        if self.kernel == "linear":
+            decision_boundary = smm.decision_function(rand_ins)
+            norm_weights = np.linalg.norm(smm.coef_)
+            num_support_vectors = smm.n_support_
+            distance = decision_boundary / norm_weights
+            return distance, num_support_vectors
 
-        smm = self.get_ssm()
-        decision_boundary = smm.decision_function(
-            self.select_random_elements()[0]
-        )
-        norm_weights = np.linalg.norm(smm.coef_)
-        num_support_vectors = smm.n_support_
-        distance = decision_boundary / norm_weights
-        return distance, num_support_vectors
-
-    def supervised_metric_svm(self):
-        smm = self.get_ssm()
-        relative_distance = smm.decision_function(
-            self.select_random_elements()[0]
-        )
-        num_support_vectors = smm.n_support_
-        return relative_distance, num_support_vectors
+        if self.kernel != "linear":
+            relative_distance = smm.decision_function(rand_ins)
+            num_support_vectors = smm.n_support_
+            return relative_distance, num_support_vectors
+        return None
 
     def selection_metric(self, x):
-        if self.kernel == 'linear':
-            return self.supervised_metric_svm_linear()[x]
-        return self.supervised_metric_svm()[x]
+        return self.get_ssm()[x]
 
     def select_minimum_instance_binary(self, x):
         if self.task == 'binary':
@@ -130,7 +119,6 @@ class SSM:
         return self.select_minimum_instance(x)
 
     def compute_support_vector_stability(self, support_vec_list):
-
         if self.task != 'binary' and \
                 np.allclose(support_vec_list[-2], support_vec_list[-1]):
             return True
@@ -158,6 +146,15 @@ class SSM:
                     self.compute_support_vector_stability(support_vector_list):
                 should_continue = False
         return selected_instances
+
+    def get_active_learned_instances(self):
+        select_active_instances = self.select_active_learned_instances()
+        selected_data_instances_index = [
+            self.rand_indices[index][active_index] for index, active_index in
+            enumerate(select_active_instances)
+        ]
+        return self.dataset[selected_data_instances_index], \
+            self.labels[selected_data_instances_index]
 
 
 if __name__ == '__main__':
